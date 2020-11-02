@@ -11,18 +11,68 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # I. El estudio (cuestiones a responder).
 
+## I.1. Descripción del estudio.
 
+## I.2. Librerías, directorios y opciones.
+
+
+```{r}
+suppressMessages( library(Biobase) )
+suppressMessages( library(GEOquery) )
+suppressMessages( library(genefilter) )
+suppressMessages( library(oligo) )
+suppressMessages( library(arrayQualityMetrics) )
+suppressMessages( library(ggplot2) )
+suppressMessages( library(ggrepel) )
+suppressMessages( library(gmodels) )
+```
 
 
 
 
 # II. Análisis.
 
+## II.1. Obtención y lectura de los datos.
+
+
+## II.2. Exploración, control de calidad y normalización.
+
+
+### II.2.1. Control de calidad.
+
+
+### II.2.2. Normalización y filtraje.
 
 
 
+## II.3. Selección de genes diferencialmente expresados.
 
+
+### II.3.1. Análisis basado en modelos lineales.
+
+
+### II.3.2. Comparaciones múltiples.
+
+
+### II.3.3. Anotación de resultados.
+
+
+### II.3.4. Visualización de los perfiles de expresión.
 
 
 
 # III. Resultados y discusión.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
