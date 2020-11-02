@@ -35,9 +35,11 @@ workingDir <- getwd()
 # Creamos los directorios de datos y resultados:
 system("mkdir data")
 system("mkdir results")
+system("mkdir celfiles")
 # Los asignamos a variables:
 dataDir <-file.path(workingDir, "data")
 resultsDir <- file.path(workingDir, "results")
+celfilesDir <- file.path(workingDir,"celfiles")
 # Seleccionamos el directorio de trabajo:
 setwd(workingDir)
 ```
@@ -55,6 +57,45 @@ source(file.path(functionsDir,"plotPCA.R"))
 # II. Análisis.
 
 ## II.1. Obtención y lectura de los datos.
+
+
+
+
+```{r}
+gse <- getGEO("GSE3311", GSEMatrix = T, destdir = dataDir)
+# Descargamos los datos ('raw data') en la carpeta de datos:
+a <- getGEOSuppFiles("GSE3311",makeDirectory = F, baseDir = dataDir)
+```
+
+
+
+```{r}
+# get info from gse
+filedata <- pData(phenoData(gse[[1]]))
+sampleNames <- rownames(filedata)
+# get dataframe with .CEL files names:
+file_to_txt <- data.frame(file_name=paste(sampleNames,'.CEL',sep=''),dataDir)
+# Creamos una tabla con las muestras seleccionadas:
+write.table(file_to_txt, 
+            file=file.path(dataDir, "targets.txt"),
+            sep="\t", 
+            row.names=FALSE, 
+            quote=FALSE)
+```
+
+```{r}
+# Directory the .tar was saved to:
+unpackDir <-  celfilesDir
+# Decompress .tar file:
+untar(file.path(dataDir, 'GSE3311_RAW.tar'), exdir = celfilesDir)
+# Delete .tar file:
+#file.remove(file.path(unpackDir, 'GSE18198_RAW.tar'))
+
+# Decompress all .gz files in our directory:
+for (i in list.files(unpackDir)) {
+  gunzip(file.path(unpackDir, i))
+}
+```
 
 
 ## II.2. Exploración, control de calidad y normalización.

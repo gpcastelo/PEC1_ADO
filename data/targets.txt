@@ -1,0 +1,7 @@
+file_name	dataDir
+GSM74493.CEL	C:/Users/G-mo10/Desktop/repos_ado/PEC1_ADO/data
+GSM74494.CEL	C:/Users/G-mo10/Desktop/repos_ado/PEC1_ADO/data
+GSM74495.CEL	C:/Users/G-mo10/Desktop/repos_ado/PEC1_ADO/data
+GSM74496.CEL	C:/Users/G-mo10/Desktop/repos_ado/PEC1_ADO/data
+GSM74497.CEL	C:/Users/G-mo10/Desktop/repos_ado/PEC1_ADO/data
+GSM74498.CEL	C:/Users/G-mo10/Desktop/repos_ado/PEC1_ADO/data
