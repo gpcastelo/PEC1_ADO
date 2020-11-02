@@ -20,6 +20,7 @@ Comenzamos cargando todas las librerías que nos harán falta a lo largo del an�
 ```{r}
 suppressMessages( library(Biobase) )
 suppressMessages( library(GEOquery) )
+suppressMessages( library(affy) )
 suppressMessages( library(genefilter) )
 suppressMessages( library(oligo) )
 suppressMessages( library(arrayQualityMetrics) )
@@ -67,14 +68,22 @@ gse <- getGEO("GSE3311", GSEMatrix = T, destdir = dataDir)
 a <- getGEOSuppFiles("GSE3311",makeDirectory = F, baseDir = dataDir)
 ```
 
+Podemos explorar su contenido:
 
+```{r}
+rownames(pData(phenoData(gse[[1]])))
+colnames(pData(phenoData(gse[[1]])))
+head(pData(phenoData(gse[[1]])))
+```
+
+Vemos que los tres primeros ficheros CEL corresponden al tratamiento control y los otros tres al tratamiento con etanol.
 
 ```{r}
 # get info from gse
 filedata <- pData(phenoData(gse[[1]]))
 sampleNames <- rownames(filedata)
 # get dataframe with .CEL files names:
-file_to_txt <- data.frame(file_name=paste(sampleNames,'.CEL',sep=''),dataDir)
+file_to_txt <- data.frame(file_name=paste(sampleNames,'.CEL',sep=''),dataDir,filedata)
 # Creamos una tabla con las muestras seleccionadas:
 write.table(file_to_txt, 
             file=file.path(dataDir, "targets.txt"),
@@ -97,11 +106,100 @@ for (i in list.files(unpackDir)) {
 }
 ```
 
+Lectura de datos (los cargamos en R):
+```{r}
+#require(Biobase)
+sampleInfo <-read.AnnotatedDataFrame(
+  file.path(dataDir,"targets.txt"), 
+  header = TRUE, row.names = 1) 
+show(pData(sampleInfo))
+```
+
+El contenido del archivo targets se utiliza en la lectura de los datos y la creación del objeto rawData de la clase affybatch que contendrá las intensidades “crudas” de cada archivo .CEL.
+
+```{r}
+fileNames <- rownames(pData(sampleInfo))
+rawData <- read.affybatch(filenames=file.path(celfilesDir,fileNames),
+                          phenoData=sampleInfo)
+show(rawData)
+```
+
 
 ## II.2. Exploración, control de calidad y normalización.
 
+```{r}
+sampleNames <- filedata$title
+plotPCA(exprs(rawData), labels=sampleNames, dataDesc="selected samples")
+```
+
+Distribución de señales:
+
+```{r}
+info <- data.frame(grupo=c(1,1,1,2,2,2))
+#sampleNames <- filedata$title
+hist(rawData, main="Signal distribution", col=info$grupo, lty=1:ncol(info))
+legend (x="topright", 
+        legend=sampleNames,#c(rep('Control',3),rep('Ethanol',3)) , 
+        col=info$grupo, lty=1:ncol(info)
+        )
+```
+
+
+Boxplot:
+
+```{r}
+colores <- c(rep("yellow", 3), rep("green", 3))
+boxplot(rawData, cex.axis=0.6, col=colores, las=2, 
+        names=c(rep('Control',3),rep('Ethanol',3)),
+        main="Signal distribution for diets")
+```
+
+```{r}
+#heatmap:
+manDist <-  dist(t(exprs(rawData))) 
+heatmap (as.matrix(manDist),  col=heat.colors(16),
+         labRow = sampleNames, labCol = sampleNames) 
+```
+
+```{r}
+## ----plotDendro
+clust.euclid.average <- hclust(dist(t(exprs(rawData))),method="average")
+plot(clust.euclid.average, labels=sampleNames, main="Hierarchical clustering of samples",  hang=-1)
+```
+
+
 
 ### II.2.1. Control de calidad.
+
+El paquete affyQCReport encapsula los análisis que pueden realizarse con el paquete simpleaffy, de forma que con una instrucción se pueden realizar todos los análisis y enviar la salida a un archivo.
+
+```{r}
+stopifnot(require(affyQCReport))
+QCReport(rawData,file=file.path(resultsDir,"QCReport.pdf"))
+```
+
+El paquete affyPLM realiza un control de calidad basado en lo que se conoce como modelos a nivel de sonda o probe-level models, conocidos por sus siglas (PLM).
+
+```{r}
+stopifnot(require(affyPLM))
+computePLM <- T
+if(computePLM){
+  Pset<- fitPLM(rawData)
+  save(Pset, file=file.path(dataDir,"PLM.Rda"))
+}else{
+  load (file=file.path(dataDir,"PLM.Rda"))
+}
+```
+
+Como resultado del ajuste PLM se pueden obtener dos gráficos, uno de expresiones relativas y otro con errores estandarizados (figura 27). Si los datos son de calidad, ambos gráficos deben ser centrados y relativamente simétricos. Cambios en esta situación sugieren problemas en los arrays que no los verifiquen.
+
+```{r}
+RLE(Pset, main = "Relative Log Expression", names=sampleNames, las=2, col=info$grupo+1, cex.axis=0.6,ylim=c(-5,5))
+```
+
+```{r}
+NUSE(Pset, main = "Normalized Unscaled Standard Errors", las=2, names=sampleNames, col=info$grupo+1, cex.axis=0.6, ylim=c(0.5,1.5))
+```
 
 
 ### II.2.2. Normalización y filtraje.
