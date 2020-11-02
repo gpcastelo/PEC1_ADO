@@ -13,8 +13,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## I.1. Descripción del estudio.
 
-## I.2. Librerías, directorios y opciones.
+## I.2. Librerías y directorios.
 
+Comenzamos cargando todas las librerías que nos harán falta a lo largo del análisis.
 
 ```{r}
 suppressMessages( library(Biobase) )
@@ -27,7 +28,19 @@ suppressMessages( library(ggrepel) )
 suppressMessages( library(gmodels) )
 ```
 
+Para facilitar el estudio, trabajaremos en un directorio escogido por nosotros y cuya localización se asigna a la variable `workingDir`. Los datos se copiarán en un subdirectorio del anterior denominado `data`, que se almacenará en la variable `dataDir` y los resultados se almacenarán en un directorio `results`, cuyo nombre se almacenará en la variable `resultsDir`.
 
+```{r}
+workingDir <- getwd()
+# Creamos los directorios de datos y resultados:
+system("mkdir data")
+system("mkdir results")
+# Los asignamos a variables:
+dataDir <-file.path(workingDir, "data")
+resultsDir <- file.path(workingDir, "results")
+# Seleccionamos el directorio de trabajo:
+setwd(workingDir)
+```
 
 
 # II. Análisis.
