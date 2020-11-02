@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## I.1. Descripción del estudio.
 
-## I.2. Librerías y directorios.
+## I.2. Librerías, directorios y funciones.
 
 Comenzamos cargando todas las librerías que nos harán falta a lo largo del análisis.
 
@@ -40,6 +40,15 @@ dataDir <-file.path(workingDir, "data")
 resultsDir <- file.path(workingDir, "results")
 # Seleccionamos el directorio de trabajo:
 setwd(workingDir)
+```
+
+Cargamos las funciones necesarias para el análisis.
+
+```{r}
+# Declaramos el directorio de funciones:
+functionsDir <- file.path(workingDir, "functions/")
+# Cargamos la función plotPCA.R
+source(file.path(functionsDir,"plotPCA.R"))
 ```
 
 
