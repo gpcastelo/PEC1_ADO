@@ -82,6 +82,7 @@ head(pData(phenoData(gse[[1]])))
 
 Vemos que los tres primeros ficheros CEL corresponden al tratamiento control y los otros tres al tratamiento con etanol.
 
+
 ```{r}
 # get info from gse
 filedata <- pData(phenoData(gse[[1]]))
@@ -131,8 +132,39 @@ show(rawData)
 
 ## II.2. Exploración, control de calidad y normalización.
 
+Veamos los nombres de cada muestra.
+
 ```{r}
 sampleNames <- filedata$title
+sampleNames
+```
+
+Como son muy largos para utilizarlos directamente en los siguientes gráficos, simplificaremos sus nombres:
+
+```{r}
+sampleNames <- c('Control_1','Control_2','Control_3','Ethanol_1','Ethanol_3','Ethanol_3')
+sampleNames
+```
+
+Una forma más computacional de crear este vector sería la siguiente:
+
+```{r}
+dummy_control <- c()
+for (i in 1:3) {
+  dummy_control <- c(dummy_control,paste('Control_',as.character(i),sep = ''))
+}
+
+dummy_ethanol <- c()
+for (i in 1:3) {
+  dummy_ethanol <- c(dummy_ethanol,paste('Ethanol_',as.character(i),sep = ''))
+}
+
+sampleNames <- c(dummy_control,dummy_ethanol)
+sampleNames
+```
+
+
+```{r}
 plotPCA(exprs(rawData), labels=sampleNames, dataDesc="selected samples")
 ```
 
@@ -140,7 +172,7 @@ Distribución de señales:
 
 ```{r}
 info <- data.frame(grupo=c(1,1,1,2,2,2))
-#sampleNames <- filedata$title
+
 hist(rawData, main="Signal distribution", col=info$grupo, lty=1:ncol(info))
 legend (x="topright", 
         legend=sampleNames,#c(rep('Control',3),rep('Ethanol',3)) , 
@@ -317,7 +349,7 @@ c(1,1,1,0,0,0,
 nrow=6,
 byrow=F)
 colnames(design.1)<-c("Control", "Ethanol")
-rownames(design.1) <-  c('Control_1','Control_2','Control_3','Ethanol_1','Ethanol_2','Ethanol_3')
+rownames(design.1) <-  sampleNames
 print(design.1)
 ```
 
@@ -329,12 +361,12 @@ targets <- pData(eset_rma)
 ```
 
 ```{r}
-lev<-factor(c('Control','Control','Control','Ethanol','Ethanol','Ethanol'), 
+lev<-factor(c(rep('Control',3),rep('Ethanol',3)), 
             levels=c('Control','Ethanol')
             )
 design <-model.matrix(~0+lev)
 colnames(design)<-levels(lev)
-rownames(design) <-sampleNames
+rownames(design) <- sampleNames
 print(design)
 ```
 
@@ -388,7 +420,7 @@ Una forma de visualizar los resultados es mediante un _volcano plot_, que repres
 ```{r}
 coefnum = 1
 opt <- par(cex.lab = 0.7)
-volcanoplot(fit.main, coef=coefnum, highlight=10, names=rownames(fit.main), 
+volcanoplot(fit.main, coef=coefnum, highlight=0, names=rownames(fit.main), 
             main=paste("Differentially expressed genes",colnames(cont.matrix)[coefnum], sep="\n"))
 abline(v=c(-1,1))
 ```
@@ -456,16 +488,15 @@ exprs2cluster <-exprs(eset_rma)[probeNames.selected,]
 Para representar el Heatmap solo necesitamos la matriz de datos resultante.
 
 ```{r}
-color.map <- function(horas) { if (horas< 20) "yellow" else "red" }
-grupColors <- unlist(lapply(pData(eset_rma)$dataDir, color.map))
+grupColors <- c('red','salmon','pink','navy','blue','cyan')
 heatmap(exprs2cluster, col=rainbow(100), ColSideColors=grupColors, cexCol=0.9)
 ```
 
 Si se desea realizar mapas de color más sofisticados, puede utilizarse el paquete gplots que implementa una versión mejorada en la función `heatmap.2`.
 
 ```{r}
-color.map <- function(horas) { if (horas< 20) "yellow" else "red" }
-grupColors <- unlist(lapply(pData(eset_rma)$dataDir, color.map))
+
+#grupColors <- unlist(lapply(pData(eset_rma)$dataDir, color.map))
 
 #require("gplots")
 
@@ -477,50 +508,47 @@ heatmap.2(exprs2cluster,
 
 ### II.3.5. Análisis de significación biológica.
 
-```{r}
-require(annotate)
-top1 <-rownames(topTab)
-geneSymbol1 <- getSYMBOL(top1, "rae230a.db")
-GOAnots1 <- mget(top1, rae230aGO)
-for (i in 1:length(GOAnots1)){
-  for (j in 1:length(GOAnots1[[i]])){
-    GOAnot <- GOAnots1[[i]][[j]][[1]]
-    cat(top1[i],geneSymbol1[i],GOAnot,substr(Term(GOAnot),1,30), "\n")
-  }
-}
-```
+Vamos a estudiar las funciones de los genes buscando sus anotaciones en bases de datos de anotación funcional como la Gene Ontology
+(GO)).
 
+Antes de empezar a hacer inferencias sobre el significado de una anotación debería poderse establecer si dicha anotación está relacionada con el proceso que se está estudiando o aparece por azar entre la muchas anotaciones de losgenes de la lista. 
+
+Para ello, realizamos un análisis de enriquecimiento con Bioconductor.
 
 ```{r}
  require(GOstats)
  require(rae230a.db)
- if(!(require(org.Mm.eg.db)))
-   biocLite("org.Mm.eg.db")
- require(org.Mm.eg.db)
+
  
    # Seleccionamos la "topTable"
    topTab <- topTab
    # Definimos el universo de genes: todos los que se han incluido en el an\'alisis
    # EL programa trabaja con identificadores "entrez" y no admite duplicados
  
-   entrezUniverse = unique(getEG(as.character(rownames(topTab)), "rae230a.db"))
+   entrezUniverse <- unique(getEG(as.character(rownames(topTab)), "rae230a.db"))
  
+   # Filtramos posibles NA:
+   entrezUniverse <- entrezUniverse[!is.na(entrezUniverse)]
+   
    # Escogemos los grupos de sondas a incluir en el an\'alisis
    # Este an\'alisis trabaja bien con varios centenares de genes
    # por lo que es habitual basarse en p-valores sin ajustar para incluirlos
  
    whichGenes<-topTab["adj.P.Val"]<0.001
-   geneIds <-   unique(getEG(as.character(rownames(topTab[whichGenes])),"rae230a.db"))
+   geneIds <-   unique(getEG(as.character(rownames(topTab)[whichGenes[,1]]),"rae230a.db"))
  
+   # Filtramos posibles NA:
+   geneIds <- geneIds[!is.na(geneIds)]
+   
    # Creamos los "hiperpar\'ametros" en que se basa el an\'alisis
    GOparams = new("GOHyperGParams",
      geneIds=geneIds, universeGeneIds=entrezUniverse,
-     annotation="org.Mm.eg.db", ontology="BP",
+     annotation="rae230a.db", ontology="BP",
      pvalueCutoff=0.001, conditional=FALSE,
      testDirection="over")
    KEGGparams = new("KEGGHyperGParams",
      geneIds=geneIds, universeGeneIds=entrezUniverse,
-     annotation="org.Mm.eg.db",
+     annotation="rae230a.db",
      pvalueCutoff=0.01, testDirection="over")
  
    # Ejecutamos los an\'alisis
@@ -529,7 +557,7 @@ for (i in 1:length(GOAnots1)){
    KEGGhyper = hyperGTest(KEGGparams)
  
  # Creamos un informe html con los resultados
-    comparison = "topTab_LPS.in.AGED"
+    comparison = "Diet"
     GOfilename =file.path(resultsDir,
       paste("GOResults.",comparison,".html", sep=""))
     KEGGfilename =file.path(resultsDir,
