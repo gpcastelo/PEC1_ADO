@@ -21,6 +21,7 @@ Comenzamos cargando todas las librerías que nos harán falta a lo largo del an�
 suppressMessages( library(Biobase) )
 suppressMessages( library(GEOquery) )
 suppressMessages( library(affy) )
+suppressMessages( library(limma) )
 suppressMessages( library(genefilter) )
 suppressMessages( library(oligo) )
 suppressMessages( library(arrayQualityMetrics) )
@@ -204,12 +205,160 @@ NUSE(Pset, main = "Normalized Unscaled Standard Errors", las=2, names=sampleName
 
 ### II.2.2. Normalización y filtraje.
 
+El procesado mediante RMA implica un proceso en tres etapas:
+
+- Corrección de fondo (el RMA hace precisamente esto).
+
+- Normalización para hacer los valores de los arrays comparables.
+
+- Resumen (sumarización) de las diversas sondas asociadas a cada grupo de sondas para dar un único valor.
+
+```{r}
+stopifnot(require(affy))
+normalize <- T
+if(normalize){
+  eset_rma <- affy::rma(rawData)    
+  save(eset_rma, file=file.path(dataDir,"normalized.Rda"))
+}else{
+  load (file=file.path(dataDir,"normalized.Rda"))
+}
+```
+
+Un boxplot de los valores normalizados sugiere que los valores ya están en una escala en donde se pueden comparar.
+
+
+```{r}
+boxplot(eset_rma,main="RMA", names=sampleNames, cex.axis=0.7, col=info$grupo+1,las=2)
+```
+
+**Filtraje**:
+
+El filtraje no específico permite eliminar los genes que varían poco entre condiciones o que deseamos quitar por otras razones, como por ejemplo que no disponemos de anotación para ellos. La función nsFilter permite eliminar los genes que, o bien varían poco, o bien no se dispone de anotación para ellos.
+
+Si al filtrar deseamos usar las anotaciones, o la falta de ellas, como criterio de filtraje, debemos disponer del correspondiente paquete de anotaciones.
+
+En nuestro caso, tenemos que instalar el paquete 'rae230a.db':
+```{r cho = T, results = 'hide'}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("rae230a.db")
+```
+
+
+```{r}
+filtered <- nsFilter(eset_rma, require.entrez=TRUE,
+                     remove.dupEntrez=TRUE, var.func=IQR,
+                     var.cutoff=0.5, var.filter=TRUE,
+                     filterByQuantile=TRUE, feature.exclude="^AFFX")
+class(filtered)
+names(filtered)
+dim(exprs(filtered$eset))
+```
+
+La función nsFilter devuelve los valores filtrados en un objeto expressionSet y un informe de los resultados del filtraje.
+
+```{r}
+class(filtered$eset)
+print(filtered$filter.log)
+eset_filtered <-filtered$eset
+```
+
+Podemos grabar el objeto eset_rma y los datos filtrados para su posterior uso.
+
+```{r}
+save(eset_rma, eset_filtered, file=file.path(resultsDir, "estrogen-normalized.Rda"))
+```
+
+Después del filtraje han quedado 5227 genes disponibles para analizar.
 
 
 ## II.3. Selección de genes diferencialmente expresados.
 
-
 ### II.3.1. Análisis basado en modelos lineales.
+
+**Matriz de diseño**:
+
+Manualmente:
+
+Tomamos como modelo lineal el siguiente:
+$$
+Y_{ij}=\alpha_i + \epsilon_{ij}
+$$
+
+Donde $\alpha_i$ tiene en cuenta el tipo de tratamiento, es decir:
+$$
+\left\{\begin{matrix}
+\alpha_1=(Control)\\ 
+\alpha_2=(Ethanol)\\ 
+\end{matrix}\right.
+$$
+
+Por tanto, la matriz de diseño es:
+$$
+\begin{pmatrix}
+1 & 0 \\ 
+1 & 0 \\ 
+1 & 0 \\ 
+0 & 1 \\ 
+0 & 1 \\ 
+0 & 1 \\ 
+\end{pmatrix}
+$$
+La escribimos en forma de código:
+
+```{r}
+design.1<-matrix(
+c(1,1,1,0,0,0,
+  0,0,0,1,1,1),
+nrow=6,
+byrow=F)
+colnames(design.1)<-c("Control", "Ethanol")
+rownames(design.1) <-  c('Control_1','Control_2','Control_3','Ethanol_1','Ethanol_2','Ethanol_3')
+print(design.1)
+```
+
+
+Computacionalmente, utilizando el paquete `limma`.
+```{r}
+if (!exists("eset_rma"))  load(file.path(dataDir, "normalized.rda"))
+targets <- pData(eset_rma)
+```
+
+```{r}
+lev<-factor(c('Control','Control','Control','Ethanol','Ethanol','Ethanol'), 
+            levels=c('Control','Ethanol')
+            )
+design <-model.matrix(~0+lev)
+colnames(design)<-levels(lev)
+rownames(design) <-sampleNames
+print(design)
+```
+
+**Contrastes**:
+
+En este caso, nos interesa estudiar el efecto del etanol en la dieta de los ratones, es decir, la diferencia entre la dieta con etanol y la dieta control.
+
+Lo podemos formular como:
+$$
+\beta=\alpha_2-\alpha_1 \rightarrow  efecto\; del \; etanol
+$$
+La matriz de contraste correspondiente es, simplemente:
+
+$$
+\bigl(\begin{smallmatrix}
+1 & -1
+\end{smallmatrix}\bigr)
+$$
+Esta se puede hallar también de forma computacional:
+
+```{r}
+cont.matrix <- makeContrasts (
+  Diet = Ethanol - Control,
+  levels=design
+  )
+cont.matrix
+```
 
 
 ### II.3.2. Comparaciones múltiples.
