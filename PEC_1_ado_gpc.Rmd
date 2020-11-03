@@ -238,7 +238,7 @@ NUSE(Pset, main = "Normalized Unscaled Standard Errors", las=2, names=sampleName
 ```
 
 
-### II.2.2. Normalización y filtraje.
+### II.2.2. Normalización.
 
 El procesado mediante RMA implica un proceso en tres etapas:
 
@@ -266,7 +266,39 @@ Un boxplot de los valores normalizados sugiere que los valores ya están en una 
 boxplot(eset_rma,main="RMA", names=sampleNames, cex.axis=0.7, col=info$grupo+1,las=2)
 ```
 
-**Filtraje**:
+### II.2.3. Control de calidad de los datos normalizados.
+
+El paquete affyQCReport encapsula los análisis que pueden realizarse con el paquete simpleaffy, de forma que con una instrucción se pueden realizar todos los análisis y enviar la salida a un archivo.
+
+```{r}
+stopifnot(require(affyQCReport))
+QCReport(ReadAffy(eset_rma),file=file.path(resultsDir,"QCReport_normalized.pdf"))
+```
+
+El paquete affyPLM realiza un control de calidad basado en lo que se conoce como modelos a nivel de sonda o probe-level models, conocidos por sus siglas (PLM).
+
+```{r}
+stopifnot(require(affyPLM))
+computePLM <- T
+if(computePLM){
+  Pset<- fitPLM(eset_rma)
+  save(Pset, file=file.path(dataDir,"PLM_normalized.Rda"))
+}else{
+  load (file=file.path(dataDir,"PLM_normalized.Rda"))
+}
+```
+
+Como resultado del ajuste PLM se pueden obtener dos gráficos, uno de expresiones relativas y otro con errores estandarizados (figura 27). Si los datos son de calidad, ambos gráficos deben ser centrados y relativamente simétricos. Cambios en esta situación sugieren problemas en los arrays que no los verifiquen.
+
+```{r}
+RLE(Pset, main = "Relative Log Expression", names=sampleNames, las=2, col=info$grupo+1, cex.axis=0.6,ylim=c(-5,5))
+```
+
+```{r}
+NUSE(Pset, main = "Normalized Unscaled Standard Errors", las=2, names=sampleNames, col=info$grupo+1, cex.axis=0.6, ylim=c(0.5,1.5))
+```
+
+### II.2.4. Filtraje.
 
 El filtraje no específico permite eliminar los genes que varían poco entre condiciones o que deseamos quitar por otras razones, como por ejemplo que no disponemos de anotación para ellos. La función nsFilter permite eliminar los genes que, o bien varían poco, o bien no se dispone de anotación para ellos.
 
