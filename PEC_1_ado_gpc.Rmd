@@ -1,23 +1,42 @@
 ---
 title: "PEC 1. Análisis de datos ómicos."
 author: "Guillermo Prol Castelo"
-date: "11/2/2020"
-output: html_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    theme: united
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# I. El estudio (cuestiones a responder).
+# I. Abstract.
 
-## I.1. Descripción del estudio.
+In this microarray analysis, a study of the effect of chronic ethanol consumption on rat pancreas has been chosen (GEO reference _GSE3311_). In the following, the experiment, data and analysis workflow are described. An in-depth analysis of the microarray is carried out to find out whether there exist any differences between the control and treatment with ethanol groups. It is decided that such a significant difference exist: ethanol had an effect on gene expression.
 
-## I.2. Librerías, directorios y funciones.
+# II. Objetivos.
+
+Queremos saber si existen diferencias en la expresión genética del páncreas de aquellos ratones que siguieron una dieta con etanol.
+
+# III. Materiales y métodos.
+
+## III.1. Los datos.
+
+Están disponibles a través del identificador _GSE3311_ en _Gene Expression Omnibus (GEO)_. Se trata de un microarray de Affymetrix en el que se analizó la expresión de RNA de los grupos control y de tratamiento. El tratamiento corresponde a una dieta que incluye etanol. Ambas se suministraron a ratones ( _Rattus norvegicus_) durante 8 semanas.
+
+El experimento se diseñó con dos factores, correspondientes al tipo de dieta: control y etanol. Cada tipo de dieta se repitió 3 veces, cada una en 6 ratones (macho) escogidos al azar en un determinado rango de peso (90-120 g). Podemos decir que el diseño del experimento es aleatorio (los factores o dietas se asignaron al azar a las unidades experimentales o ratones).
+
+## III.2. Métodos.
+
+Para analizar los datos del microarray hemos seguido un _workflow_ que comienza por crear todas las carpetas necesarias en el fichero en que nos encontremos. A continuación, obtenemos los datos de GEO y extraemos los ficheros .CEL. Una vez importados a R, podemos explorar estos datos, realizar un control de calidad, normalizarlos y filtrarlos. Una vez hecho esto, podemos anotar los resultados, realizar comparaciones múltiples y un análisis de significación biológica.
+
+## III.3. Librerías, directorios y funciones.
 
 Comenzamos cargando todas las librerías que nos harán falta a lo largo del análisis.
 
-```{r}
+```{r cho = T, results = 'hide'}
 suppressMessages( library(Biobase) )
 suppressMessages( library(GEOquery) )
 suppressMessages( library(affy) )
@@ -31,9 +50,10 @@ suppressMessages( library(arrayQualityMetrics) )
 suppressMessages( library(ggplot2) )
 suppressMessages( library(ggrepel) )
 suppressMessages( library(gmodels) )
+suppressMessages( library(affyQCReport) )
 ```
 
-Para facilitar el estudio, trabajaremos en un directorio escogido por nosotros y cuya localización se asigna a la variable `workingDir`. Los datos se copiarán en un subdirectorio del anterior denominado `data`, que se almacenará en la variable `dataDir` y los resultados se almacenarán en un directorio `results`, cuyo nombre se almacenará en la variable `resultsDir`.
+Para facilitar el estudio, trabajaremos en un directorio escogido por nosotros y cuya localización se asigna a la variable `workingDir`. Los datos se copiarán en un subdirectorio del anterior denominado `data`, que se almacenará en la variable `dataDir` y los resultados se almacenarán en un directorio `results`, cuyo nombre se almacenará en la variable `resultsDir`. También creamos la carpeta `celfiles` para guardar en ella los ficheros .CEL.
 
 ```{r}
 workingDir <- getwd()
@@ -59,14 +79,14 @@ source(file.path(functionsDir,"plotPCA.R"))
 ```
 
 
-# II. Análisis.
+# IV. Resultados
 
-## II.1. Obtención y lectura de los datos.
+## IV.1. Obtención y lectura de los datos.
 
-
-
+Comenzamos por obtener los datos desde _GEO Accession_:
 
 ```{r}
+# Guardamos los datos en una variable en R:
 gse <- getGEO("GSE3311", GSEMatrix = T, destdir = dataDir)
 # Descargamos los datos ('raw data') en la carpeta de datos:
 a <- getGEOSuppFiles("GSE3311",makeDirectory = F, baseDir = dataDir)
@@ -101,14 +121,14 @@ write.table(file_to_txt,
 # Directory the .tar was saved to:
 unpackDir <-  celfilesDir
 # Decompress .tar file:
-untar(file.path(dataDir, 'GSE3311_RAW.tar'), exdir = celfilesDir)
+#untar(file.path(dataDir, 'GSE3311_RAW.tar'), exdir = celfilesDir)
 # Delete .tar file:
 #file.remove(file.path(unpackDir, 'GSE18198_RAW.tar'))
 
 # Decompress all .gz files in our directory:
-for (i in list.files(unpackDir)) {
-  gunzip(file.path(unpackDir, i))
-}
+#for (i in list.files(unpackDir)) {
+#  gunzip(file.path(unpackDir, i))
+#}
 ```
 
 Lectura de datos (los cargamos en R):
@@ -120,7 +140,7 @@ sampleInfo <-read.AnnotatedDataFrame(
 show(pData(sampleInfo))
 ```
 
-El contenido del archivo targets se utiliza en la lectura de los datos y la creación del objeto rawData de la clase affybatch que contendrá las intensidades “crudas” de cada archivo .CEL.
+El contenido del archivo targets se utiliza en la lectura de los datos y la creación del objeto rawData de la clase `affybatch` que contendrá las intensidades “crudas” de cada archivo .CEL.
 
 ```{r}
 fileNames <- rownames(pData(sampleInfo))
@@ -130,7 +150,7 @@ show(rawData)
 ```
 
 
-## II.2. Exploración, control de calidad y normalización.
+## IV.2. Exploración, control de calidad y normalización.
 
 Veamos los nombres de cada muestra.
 
@@ -163,6 +183,7 @@ sampleNames <- c(dummy_control,dummy_ethanol)
 sampleNames
 ```
 
+Podemos visualizar los datos con varios tipos de gráficos.
 
 ```{r}
 plotPCA(exprs(rawData), labels=sampleNames, dataDesc="selected samples")
@@ -190,12 +211,16 @@ boxplot(rawData, cex.axis=0.6, col=colores, las=2,
         main="Signal distribution for diets")
 ```
 
+Heatmap:
+
 ```{r}
 #heatmap:
 manDist <-  dist(t(exprs(rawData))) 
 heatmap (as.matrix(manDist),  col=heat.colors(16),
          labRow = sampleNames, labCol = sampleNames) 
 ```
+
+Dendrograma:
 
 ```{r}
 ## ----plotDendro
@@ -205,7 +230,7 @@ plot(clust.euclid.average, labels=sampleNames, main="Hierarchical clustering of 
 
 
 
-### II.2.1. Control de calidad.
+### IV.2.1. Control de calidad.
 
 El paquete affyQCReport encapsula los análisis que pueden realizarse con el paquete simpleaffy, de forma que con una instrucción se pueden realizar todos los análisis y enviar la salida a un archivo.
 
@@ -238,7 +263,7 @@ NUSE(Pset, main = "Normalized Unscaled Standard Errors", las=2, names=sampleName
 ```
 
 
-### II.2.2. Normalización.
+### IV.2.2. Normalización.
 
 El procesado mediante RMA implica un proceso en tres etapas:
 
@@ -266,13 +291,13 @@ Un boxplot de los valores normalizados sugiere que los valores ya están en una 
 boxplot(eset_rma,main="RMA", names=sampleNames, cex.axis=0.7, col=info$grupo+1,las=2)
 ```
 
-### II.2.3. Control de calidad de los datos normalizados.
+### IV.2.3. Control de calidad de los datos normalizados.
 
 El paquete affyQCReport encapsula los análisis que pueden realizarse con el paquete simpleaffy, de forma que con una instrucción se pueden realizar todos los análisis y enviar la salida a un archivo.
 
 ```{r}
-stopifnot(require(affyQCReport))
-QCReport(ReadAffy(eset_rma),file=file.path(resultsDir,"QCReport_normalized.pdf"))
+# Guardamos el informe en el fichero de resultados:
+#QCReport(ReadAffy(eset_rma),file=file.path(resultsDir,"QCReport_normalized.pdf"))
 ```
 
 El paquete affyPLM realiza un control de calidad basado en lo que se conoce como modelos a nivel de sonda o probe-level models, conocidos por sus siglas (PLM).
@@ -298,7 +323,7 @@ RLE(Pset, main = "Relative Log Expression", names=sampleNames, las=2, col=info$g
 NUSE(Pset, main = "Normalized Unscaled Standard Errors", las=2, names=sampleNames, col=info$grupo+1, cex.axis=0.6, ylim=c(0.5,1.5))
 ```
 
-### II.2.4. Filtraje.
+### IV.2.4. Filtraje.
 
 El filtraje no específico permite eliminar los genes que varían poco entre condiciones o que deseamos quitar por otras razones, como por ejemplo que no disponemos de anotación para ellos. La función nsFilter permite eliminar los genes que, o bien varían poco, o bien no se dispone de anotación para ellos.
 
@@ -323,7 +348,7 @@ names(filtered)
 dim(exprs(filtered$eset))
 ```
 
-La función nsFilter devuelve los valores filtrados en un objeto expressionSet y un informe de los resultados del filtraje.
+La función `nsFilter` devuelve los valores filtrados en un objeto `expressionSet` y un informe de los resultados del filtraje.
 
 ```{r}
 class(filtered$eset)
@@ -331,18 +356,19 @@ print(filtered$filter.log)
 eset_filtered <-filtered$eset
 ```
 
-Podemos grabar el objeto eset_rma y los datos filtrados para su posterior uso.
+Podemos grabar el objeto `eset_rma` y los datos filtrados para su posterior uso.
 
 ```{r}
+# Guardamos en el directorio de resultados:
 save(eset_rma, eset_filtered, file=file.path(resultsDir, "estrogen-normalized.Rda"))
 ```
 
 Después del filtraje han quedado 5227 genes disponibles para analizar.
 
 
-## II.3. Selección de genes diferencialmente expresados.
+## IV.3. Selección de genes diferencialmente expresados.
 
-### II.3.1. Análisis basado en modelos lineales.
+### IV.3.1. Análisis basado en modelos lineales.
 
 **Matriz de diseño**:
 
@@ -402,6 +428,8 @@ rownames(design) <- sampleNames
 print(design)
 ```
 
+Vemos que coincide con nuestra propuesta.
+
 **Contrastes**:
 
 En este caso, nos interesa estudiar el efecto del etanol en la dieta de los ratones, es decir, la diferencia entre la dieta con etanol y la dieta control.
@@ -427,14 +455,15 @@ cont.matrix <- makeContrasts (
 cont.matrix
 ```
 
-**Estimación del modelo y selección de genes.**
+También coincide con nuestra matriz de contraste.
 
+**Estimación del modelo y selección de genes.**
 
 Una vez definida la matriz de diseño y los contrastes, podemos pasar a estimar el modelo, estimar los contrastes y realizar las pruebas de significación que nos indiquen, para cada gen y cada comparación, si puede considerarse diferencialmente expresado.
 
-El análisis proporciona los estadísticos de test habituales como Fold-change tmoderados o p-valores ajustados, que se utilizan para ordenar los genes de más a menos diferencialmente expresados.
+El análisis proporciona los estadísticos de test habituales como _Fold-change_, t-moderados o p-valores ajustados, que se utilizan para ordenar los genes de más a menos diferencialmente expresados.
 
-La función topTable genera para cada contraste una lista de genes ordenados de más a menos diferencialmente expresados.
+La función `topTable` genera para cada contraste una lista de genes ordenados de más a menos diferencialmente expresados.
 
 ```{r}
 # Linear model fit:
@@ -457,8 +486,9 @@ volcanoplot(fit.main, coef=coefnum, highlight=0, names=rownames(fit.main),
 abline(v=c(-1,1))
 ```
 
+Vemos que hay varios puntos a la izquierda de -1 y a la derecha de 1. 
 
-### II.3.2. Comparaciones múltiples.
+### IV.3.2. Comparaciones múltiples.
 
 Cuando se realizan varias comparaciones a la vez puede resultar importante ver qué genes cambian simultáneamente en más de una comparación. Si el número de comparaciones es alto, también puede ser necesario realizar un ajuste de p-valores entre las comparaciones, distinto del realizado entre genes.
 
@@ -482,7 +512,7 @@ print(summary(res))
 
 
 
-### II.3.3. Anotación de resultados.
+### IV.3.3. Anotación de resultados.
 
 Para saber qué anotaciones están disponibles, debe cargarse el paquete y llamar la función del mismo nombre.
 
@@ -503,7 +533,7 @@ saveHTML (at, file.path(resultsDir, "anotations.html"),
 ```
 
 
-### II.3.4. Visualización de los perfiles de expresión.
+### IV.3.4. Visualización de los perfiles de expresión.
 
 Tras seleccionar los genes diferencialmente expresados, podemos visualizar las expresiones de cada gen agrupándolas para destacar los genes que se encuentran up o down regulados simultáneamente constituyendo perfiles de expresión.
 
@@ -538,10 +568,9 @@ heatmap.2(exprs2cluster,
           density.info="none", trace="none", cexCol=1)
 ```
 
-### II.3.5. Análisis de significación biológica.
+### IV.3.5. Análisis de significación biológica.
 
-Vamos a estudiar las funciones de los genes buscando sus anotaciones en bases de datos de anotación funcional como la Gene Ontology
-(GO)).
+Vamos a estudiar las funciones de los genes buscando sus anotaciones en bases de datos de anotación funcional como la Gene Ontology (GO).
 
 Antes de empezar a hacer inferencias sobre el significado de una anotación debería poderse establecer si dicha anotación está relacionada con el proceso que se está estudiando o aparece por azar entre la muchas anotaciones de losgenes de la lista. 
 
@@ -554,7 +583,7 @@ Para ello, realizamos un análisis de enriquecimiento con Bioconductor.
  
    # Seleccionamos la "topTable"
    topTab <- topTab
-   # Definimos el universo de genes: todos los que se han incluido en el an\'alisis
+   # Definimos el universo de genes: todos los que se han incluido en el analisis
    # EL programa trabaja con identificadores "entrez" y no admite duplicados
  
    entrezUniverse <- unique(getEG(as.character(rownames(topTab)), "rae230a.db"))
@@ -562,8 +591,8 @@ Para ello, realizamos un análisis de enriquecimiento con Bioconductor.
    # Filtramos posibles NA:
    entrezUniverse <- entrezUniverse[!is.na(entrezUniverse)]
    
-   # Escogemos los grupos de sondas a incluir en el an\'alisis
-   # Este an\'alisis trabaja bien con varios centenares de genes
+   # Escogemos los grupos de sondas a incluir en el analisis
+   # Este analisis trabaja bien con varios centenares de genes
    # por lo que es habitual basarse en p-valores sin ajustar para incluirlos
  
    whichGenes<-topTab["adj.P.Val"]<0.001
@@ -572,7 +601,7 @@ Para ello, realizamos un análisis de enriquecimiento con Bioconductor.
    # Filtramos posibles NA:
    geneIds <- geneIds[!is.na(geneIds)]
    
-   # Creamos los "hiperpar\'ametros" en que se basa el an\'alisis
+   # Creamos los "hiperparametros" en que se basa el analisis
    GOparams = new("GOHyperGParams",
      geneIds=geneIds, universeGeneIds=entrezUniverse,
      annotation="rae230a.db", ontology="BP",
@@ -583,7 +612,7 @@ Para ello, realizamos un análisis de enriquecimiento con Bioconductor.
      annotation="rae230a.db",
      pvalueCutoff=0.01, testDirection="over")
  
-   # Ejecutamos los an\'alisis
+   # Ejecutamos los analisis
  
    GOhyper = hyperGTest(GOparams)
    KEGGhyper = hyperGTest(KEGGparams)
@@ -600,18 +629,8 @@ Para ello, realizamos un análisis de enriquecimiento con Bioconductor.
 
 
 
-# III. Resultados y discusión.
+# V.Discusión.
 
+En este análisis hemos visto que existen diferencias significativas entre la expresión génica de los grupos según estos fuesen tratados con o sin etanol. Sin embargo, al principio del análisis vimos cómo en el dendograma no se distinguían los grupos según su tratamiento. 
 
-
-
-
-
-
-
-
-
-
-
-
-
+Una limitación importante de nuestro análisis es que en el análisis de significación biológica sólo se ha hallado una única entrada de Gene Ontology. Quizás cabería la posibilidad de ser más flexibles con nuestro p-valor, hasta un 1% o 5%.
