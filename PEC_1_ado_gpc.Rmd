@@ -1,11 +1,13 @@
 ---
 title: "PEC 1. Análisis de datos ómicos."
 author: "Guillermo Prol Castelo"
-date: "`r format(Sys.time(), '%d %B, %Y')`"
+date: "`r format(Sys.time(), '%d/%m/%y')`"
 output:
+  pdf_document:
+    toc: yes
   html_document:
-    toc: true
     theme: united
+    toc: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -121,14 +123,14 @@ write.table(file_to_txt,
 # Directory the .tar was saved to:
 unpackDir <-  celfilesDir
 # Decompress .tar file:
-#untar(file.path(dataDir, 'GSE3311_RAW.tar'), exdir = celfilesDir)
+untar(file.path(dataDir, 'GSE3311_RAW.tar'), exdir = celfilesDir)
 # Delete .tar file:
-#file.remove(file.path(unpackDir, 'GSE18198_RAW.tar'))
+file.remove(file.path(unpackDir, 'GSE18198_RAW.tar'))
 
 # Decompress all .gz files in our directory:
-#for (i in list.files(unpackDir)) {
-#  gunzip(file.path(unpackDir, i))
-#}
+for (i in list.files(unpackDir)) {
+  gunzip(file.path(unpackDir, i))
+}
 ```
 
 Lectura de datos (los cargamos en R):
@@ -297,7 +299,7 @@ El paquete affyQCReport encapsula los análisis que pueden realizarse con el paq
 
 ```{r}
 # Guardamos el informe en el fichero de resultados:
-#QCReport(ReadAffy(eset_rma),file=file.path(resultsDir,"QCReport_normalized.pdf"))
+QCReport(ReadAffy(eset_rma),file=file.path(resultsDir,"QCReport_normalized.pdf"))
 ```
 
 El paquete affyPLM realiza un control de calidad basado en lo que se conoce como modelos a nivel de sonda o probe-level models, conocidos por sus siglas (PLM).
@@ -360,7 +362,7 @@ Podemos grabar el objeto `eset_rma` y los datos filtrados para su posterior uso.
 
 ```{r}
 # Guardamos en el directorio de resultados:
-save(eset_rma, eset_filtered, file=file.path(resultsDir, "estrogen-normalized.Rda"))
+save(eset_rma, eset_filtered, file=file.path(resultsDir, "data-normalized.Rda"))
 ```
 
 Después del filtraje han quedado 5227 genes disponibles para analizar.
